@@ -26,10 +26,32 @@ download_font()
 API_URL = "https://api-inference.huggingface.co/models/Lykon/DreamShaper"
 headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
 
+# 3. 定義 Hugging Face API 函數 (改良版：增加錯誤偵測)
 def query_huggingface(payload):
     response = requests.post(API_URL, headers=headers, json=payload)
-    return response.content
+    
+    # 如果狀態碼不是 200 (代表成功)，就檢查發生什麼事
+    if response.status_code != 200:
+        try:
+            error_msg = response.json()
+            # 情況 A: 模型正在啟動中 (這是免費版最常見的情況)
+            if "error" in error_msg and "loading" in error_msg["error"]:
+                estimated_time = error_msg.get("estimated_time", 20)
+                st.warning(f"⚠️ 模型正在冷啟動中，請等待約 {estimated_time} 秒後再試一次！")
+                return None
+            
+            # 情況 B: 其他錯誤 (例如 Token 錯誤)
+            st.error(f"API 發生錯誤：{response.status_code}")
+            st.json(error_msg) # 把錯誤訊息印出來給你看
+            return None
+            
+        except:
+            # 萬一連 JSON 都解析不出來
+            st.error(f"發生未知錯誤，狀態碼：{response.status_code}")
+            st.write(response.text)
+            return None
 
+    return response.content
 # 4. 加字函數 (保持不變，直接沿用你寫好的)
 def add_caption(image, text, font_path='NotoSansTC-Bold.otf'):
     original_width, original_height = image.size
@@ -80,14 +102,17 @@ if st.button("生成梗圖"):
                 "parameters": {"negative_prompt": negative_prompt}
             })
             
-            try:
-                # 將回傳的 bytes 轉成圖片
-                image = Image.open(io.BytesIO(image_bytes))
+            if image_bytes: 
+                try:
+                    # 將回傳的 bytes 轉成圖片
+                    image = Image.open(io.BytesIO(image_bytes))
+                    
+                    # 加字
+                    final_image = add_caption(image, user_text)
+                    st.image(final_image, caption="你的專屬梗圖完成啦！")
+                    
+                except Exception as e:
+                    st.error("圖片處理失敗，請查看 Log")
+                    st.write(e)
                 
-                # 加字
-                final_image = add_caption(image, user_text)
-                st.image(final_image, caption="你的專屬梗圖完成啦！")
-                
-            except Exception as e:
-                st.error("生成失敗，可能是 API 忙碌中，請稍後再試。")
-                st.write(e)
+
