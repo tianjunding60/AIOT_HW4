@@ -73,7 +73,8 @@ if st.button("生成梗圖"):
                 image = client.text_to_image(
                     prompt, 
                     negative_prompt=negative_prompt,
-                    model="Lykon/DreamShaper"  # 指定模型
+                    model="stabilityai/stable-diffusion-2-1"
+                    #model=                    ## 指定模型
                 )
                 
                 # 加字
