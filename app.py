@@ -74,7 +74,6 @@ if st.button("生成梗圖"):
                     prompt, 
                     negative_prompt=negative_prompt,
                     model="stabilityai/stable-diffusion-2-1"
-                    #model=                    ## 指定模型
                 )
                 
                 # 加字
