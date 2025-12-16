@@ -71,7 +71,7 @@ if st.button("生成梗圖"):
                 image = client.text_to_image(
                     prompt, 
                     negative_prompt=negative_prompt,
-                    model="stabilityai/stable-diffusion-3.5-large"
+                    model="stabilityai/stable-diffusion-xl-base-1.0"
                 )
                 
                 # 加字
