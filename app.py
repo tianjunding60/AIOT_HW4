@@ -1,59 +1,29 @@
 import streamlit as st
-import requests
 from PIL import Image, ImageDraw, ImageFont
+from huggingface_hub import InferenceClient  # 👈 關鍵主角：官方客戶端
 import textwrap
-import io
 import os
 
 # 1. 設定頁面
 st.set_page_config(page_title="熊貓迷因產生器", page_icon="🐼")
-st.title("🐼 嘲諷熊貓迷因產生器 (Cloud API 版)")
+st.title("🐼 嘲諷熊貓迷因產生器 (官方 SDK 版)")
 st.write("輸入一句話，讓 AI 幫你生成專屬的嘲諷熊貓梗圖！")
 
-# 2. 自動下載字型 (改用 requests)
+# 2. 自動下載字型
 def download_font():
     font_path = "NotoSansTC-Bold.otf"
     if not os.path.exists(font_path):
         with st.spinner("正在下載中文字型..."):
-            url = "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/TraditionalChinese/NotoSansCJKtc-Bold.otf"
-            r = requests.get(url)
-            with open(font_path, "wb") as f:
-                f.write(r.content)
+            # 這裡可以用 os.system，因為我們最後要解決的核心是 API
+            os.system(f"wget -O {font_path} https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/TraditionalChinese/NotoSansCJKtc-Bold.otf")
 download_font()
 
-# [cite_start]3. 定義 Hugging Face API 函數 (取代原本的 pipe) [cite: 8]
-# 這裡使用 secrets 來保護你的 key
-# 注意中間多了 /hf-inference/ 這一段
-API_URL = "https://router.huggingface.co/hf-inference/models/Lykon/DreamShaper"
-headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
+# 3. 初始化 Hugging Face Client
+# 它會自動讀取 st.secrets 裡的 Token，並處理所有連線細節
+# 如果你想要換模型，只要改這裡的 model 字串即可，例如 "runwayml/stable-diffusion-v1-5"
+client = InferenceClient(token=st.secrets["HF_TOKEN"])
 
-# 3. 定義 Hugging Face API 函數 (改良版：增加錯誤偵測)
-def query_huggingface(payload):
-    response = requests.post(API_URL, headers=headers, json=payload)
-    
-    # 如果狀態碼不是 200 (代表成功)，就檢查發生什麼事
-    if response.status_code != 200:
-        try:
-            error_msg = response.json()
-            # 情況 A: 模型正在啟動中 (這是免費版最常見的情況)
-            if "error" in error_msg and "loading" in error_msg["error"]:
-                estimated_time = error_msg.get("estimated_time", 20)
-                st.warning(f"⚠️ 模型正在冷啟動中，請等待約 {estimated_time} 秒後再試一次！")
-                return None
-            
-            # 情況 B: 其他錯誤 (例如 Token 錯誤)
-            st.error(f"API 發生錯誤：{response.status_code}")
-            st.json(error_msg) # 把錯誤訊息印出來給你看
-            return None
-            
-        except:
-            # 萬一連 JSON 都解析不出來
-            st.error(f"發生未知錯誤，狀態碼：{response.status_code}")
-            st.write(response.text)
-            return None
-
-    return response.content
-# 4. 加字函數 (保持不變，直接沿用你寫好的)
+# 4. 加字函數 (這部分保持不變)
 def add_caption(image, text, font_path='NotoSansTC-Bold.otf'):
     original_width, original_height = image.size
     temp_draw = ImageDraw.Draw(image)
@@ -92,28 +62,25 @@ if st.button("生成梗圖"):
     if not user_text:
         st.warning("請先輸入文字喔！")
     else:
-        with st.spinner("呼叫遠端 AI 繪圖中 (API)..."):
-            # 設定 Prompt
-            prompt = "close up of a panda head with a funny human man face, smug expression, trolling face, meme style, simple black and white line art, vector art, flat color, white background, looking at viewer"
-            negative_prompt = "body, paws, claws, realistic fur, 3d, shading, gradient, grey, fuzzy, blurry, realistic, photo, cute, animal face, sleeping, lying down"
-            
-            # 呼叫 API
-            image_bytes = query_huggingface({
-                "inputs": prompt,
-                "parameters": {"negative_prompt": negative_prompt}
-            })
-            
-            if image_bytes: 
-                try:
-                    # 將回傳的 bytes 轉成圖片
-                    image = Image.open(io.BytesIO(image_bytes))
-                    
-                    # 加字
-                    final_image = add_caption(image, user_text)
-                    st.image(final_image, caption="你的專屬梗圖完成啦！")
-                    
-                except Exception as e:
-                    st.error("圖片處理失敗，請查看 Log")
-                    st.write(e)
+        with st.spinner("AI 正在繪製中 (這可能需要 20-30 秒)..."):
+            try:
+                # 設定 Prompt
+                prompt = "close up of a panda head with a funny human man face, smug expression, trolling face, meme style, simple black and white line art, vector art, flat color, white background, looking at viewer"
+                negative_prompt = "body, paws, claws, realistic fur, 3d, shading, gradient, grey, fuzzy, blurry, realistic, photo, cute, animal face, sleeping, lying down"
                 
-
+                # 呼叫官方 SDK 生圖
+                # text_to_image 會自動處理 API 呼叫並直接回傳 PIL.Image 物件
+                image = client.text_to_image(
+                    prompt, 
+                    negative_prompt=negative_prompt,
+                    model="Lykon/DreamShaper"  # 指定模型
+                )
+                
+                # 加字
+                final_image = add_caption(image, user_text)
+                st.image(final_image, caption="你的專屬梗圖完成啦！")
+                
+            except Exception as e:
+                st.error("生成失敗，請檢查 Token 權限或稍後再試。")
+                # 這裡會印出更詳細的錯誤訊息，幫我們除錯
+                st.write(e)
