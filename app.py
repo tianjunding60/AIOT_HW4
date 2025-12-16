@@ -24,7 +24,7 @@ download_font()
 # [cite_start]3. 定義 Hugging Face API 函數 (取代原本的 pipe) [cite: 8]
 # 這裡使用 secrets 來保護你的 key
 # 注意中間多了 /hf-inference/ 這一段
-API_URL = "https://router.huggingface.co/hf-inference/models/Lykon/DreamShaper"
+API_URL = "https://router.huggingface.co/hf-inference/models/runwayml/stable-diffusion-v1-5"
 headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
 
 # 3. 定義 Hugging Face API 函數 (改良版：增加錯誤偵測)
