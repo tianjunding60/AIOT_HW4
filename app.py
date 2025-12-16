@@ -71,7 +71,7 @@ if st.button("生成梗圖"):
                 image = client.text_to_image(
                     prompt, 
                     negative_prompt=negative_prompt,
-                    model="prompthero/openjourney"  # 改用這個不需要同意書的模型
+                    model="stabilityai/stable-diffusion-3.5-large"
                 )
                 
                 # 加字
