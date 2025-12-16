@@ -1,16 +1,17 @@
 import streamlit as st
-from PIL import Image, ImageDraw, ImageFont
+# 這裡增加了 ImageEnhance
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 from huggingface_hub import InferenceClient
 import textwrap
 import os
-import requests  # 記得 import requests
+import requests
 
 # 1. 設定頁面
 st.set_page_config(page_title="熊貓迷因產生器", page_icon="🐼")
-st.title("🐼 嘲諷熊貓迷因產生器 (SDXL 強力版)")
+st.title("🐼 嘲諷熊貓迷因產生器 (SDXL 完美版)")
 st.write("輸入一句話，讓 AI 幫你生成專屬的嘲諷熊貓梗圖！")
 
-# 2. 自動下載字型 (修正版：使用 requests，確保能成功下載)
+# 2. 自動下載字型
 def download_font():
     font_path = "NotoSansTC-Bold.otf"
     if not os.path.exists(font_path):
@@ -27,13 +28,22 @@ def download_font():
 download_font()
 
 # 3. 初始化 Hugging Face Client
-# 使用 stabilityai/stable-diffusion-xl-base-1.0 (目前最強免費模型)
 client = InferenceClient(token=st.secrets["HF_TOKEN"])
 
-# 4. 加字函數 (優化版：強制轉 RGB)
+# 4. 加字函數 (進化版：自動去除灰底 + 強制轉 RGB)
 def add_caption(image, text, font_path='NotoSansTC-Bold.otf'):
-    # 強制轉為 RGB 模式，避免格式不相容導致破圖
+    # --- 新增：圖片後處理 (美白濾鏡) ---
+    # 1. 強制轉為 RGB 模式
     image = image.convert("RGB")
+
+    # 2. 提高對比度 (讓線條更明顯，背景雜色變淡)
+    contrast_enhancer = ImageEnhance.Contrast(image)
+    image = contrast_enhancer.enhance(2.0) # 數值可微調
+
+    # 3. 提高亮度 (把剩下的淺灰色背景推向純白)
+    brightness_enhancer = ImageEnhance.Brightness(image)
+    image = brightness_enhancer.enhance(1.1) # 數值可微調
+    # ------------------------------------
     
     original_width, original_height = image.size
     temp_draw = ImageDraw.Draw(image)
@@ -54,7 +64,9 @@ def add_caption(image, text, font_path='NotoSansTC-Bold.otf'):
         text_area_height = 0
 
     new_height = original_height + text_area_height
+    # 創造純白背景
     final_image = Image.new('RGB', (original_width, new_height), color=(255, 255, 255))
+    # 貼上經過美白處理的圖片
     final_image.paste(image, (0, 0))
     
     draw = ImageDraw.Draw(final_image)
@@ -87,13 +99,13 @@ if st.button("生成梗圖"):
                     model="stabilityai/stable-diffusion-xl-base-1.0"
                 )
                 
-                # 優化：縮小圖片以節省記憶體並避免破圖 (SDXL 原圖 1024x1024 太大了)
+                # 縮小圖片
                 image = image.resize((512, 512))
                 
-                # 加字
+                # 加字 (現在會自動美白了)
                 final_image = add_caption(image, user_text)
                 
-                # 顯示圖片 (明確指定 output_format 為 PNG)
+                # 顯示圖片
                 st.image(final_image, caption="你的專屬梗圖完成啦！", output_format="PNG")
                 
             except Exception as e:
